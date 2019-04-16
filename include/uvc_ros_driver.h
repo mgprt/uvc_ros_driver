@@ -234,10 +234,20 @@ public:
 	{
 		n_cameras_ = n_cameras;
 
+		// camera_config_ is a 10 bit field that encodes what data should be published.
+		// The 5 lower bits enable the raw image output for up to 5 camera pairs.
+		// The 5 upper bits enable the the output of at rectified and a disparity image
+		// for each camera pair.
+		// Examples:
+		// 0000100001 (0x021) enables output of both raw images and one rectified and
+		// disparity image for a single camera pair.
+		// 0000011111 (0x01F) enables the output of all raw images for 5 camera pairs,
+		// but disables all rectified and disparity images.
+
 		switch (n_cameras) {
 		case 10:
-			//camera_config_ = 0x01F;
-			camera_config_ = 0x3FF;
+			//camera_config_ = 0x01F; // Only raw images
+			camera_config_ = 0x3FF; // Raw images + rectified + disparity
 			break;
 		case 8:
 			//camera_config_ = 0x00F;
@@ -246,18 +256,18 @@ public:
 
 		case 6:
 			//camera_config_ = 0x007
-			camera_config_ = 0xE7;
+			camera_config_ = 0x0E7;
 			break;
 
 		case 4:
-			camera_config_ = 0x003;
-			//camera_config_ = 0x63;
+			//camera_config_ = 0x003;
+			camera_config_ = 0x063;
 			break;
 
 		case 2:
 		default:
-			//camera_config_ = 0x01; //right output cam_right_raw
-			camera_config_ = 0x21; //right output cam_left_rect
+			//camera_config_ = 0x001;
+			camera_config_ = 0x021;
 			break;
 		}
 	};
