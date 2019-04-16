@@ -1099,6 +1099,11 @@ void uvcROSDriver::uvc_cb(uvc_frame_t *frame)
 	// publish data
 	if (cam_id == 0) {  // select_cam = 0 + 1
 		// set timestamp of all frames when cameras 8+9 are disabled
+		// (Not sure about this, but I guess in the case of 10 cameras the
+		// pair 8+9 is never written to memory and processed first. Therefore
+		// this is the correct timestamp that we want to use. With less
+		// cameras, all images are first written to memory and then processed
+		// in order).
 		if(n_cameras_ < 9){
 			frame_time_ = fpga_frame_time;
 			frameCounter_++;
@@ -1127,8 +1132,8 @@ void uvcROSDriver::uvc_cb(uvc_frame_t *frame)
 	if (cam_id == 8 && frameCounter_ % modulo_ == 0) {  // select_cam = 2 + 3
 		// FPGA can only send 2 images at time, but all of them are took at the same
 		// time, so the image time stamp should be set to the first camera pair
-		//check if camera0/camera1 raw output is disabled and set timestamp 
-		//when cameras 8+9 are disabled
+		// check if camera0/camera1 raw output is disabled and set timestamp 
+		// when cameras 8+9 are disabled
 		if(n_cameras_ < 9 && (camera_config_ & 0x001) ==0){
 			frame_time_ = fpga_frame_time;
 			frameCounter_++;
@@ -1251,50 +1256,59 @@ void uvcROSDriver::uvc_cb(uvc_frame_t *frame)
 		cam_6d_pub_.publish(msg_right_image);
 	}
 
-	if (cam_id == 4 && frameCounter_ % modulo_ == 0) {  // select_cam = 8 + 9
+	// For the last camera pair we need to handle the modulo separately inside,
+	// otherwise wenever update the frame counter in calibration mode and don't
+	// publish any images.
+	if (cam_id == 4) {  // select_cam = 8 + 9
 		// set timestamp for all frames if cam 8 + 9 enabled here
-		if(n_cameras_ >=9){
+		// See the case for cam_id == 0 for an explanation.
+		if(n_cameras_ >= 9) {
 			frame_time_ = fpga_frame_time;
 			frameCounter_++;
 		}
-		msg_left_image.header.stamp = frame_time_;
-		msg_right_image.header.stamp = frame_time_;
-		// set frame_id on images
-		msg_left_image.header.frame_id = "cam_8_optical_frame";
-		msg_right_image.header.frame_id = "cam_9_optical_frame";
 
-		// publish images
-		cam_8_pub_.publish(msg_left_image);
-		cam_9_pub_.publish(msg_right_image);
+		if (frameCounter_ % modulo_ == 0) {
+			msg_left_image.header.stamp = frame_time_;
+			msg_right_image.header.stamp = frame_time_;
+			// set frame_id on images
+			msg_left_image.header.frame_id = "cam_8_optical_frame";
+			msg_right_image.header.frame_id = "cam_9_optical_frame";
 
-		// set camera info header, stereo cameras have the save frame_id
-		setCameraInfoHeader(info_cam_8_, width_, height_, frame_time_,
-				    "cam_8_optical_frame");
-		setCameraInfoHeader(info_cam_9_, width_, height_, frame_time_,
-				    "cam_8_optical_frame");
-		// publish camera info
-		cam_8_info_pub_.publish(info_cam_8_);
-		cam_9_info_pub_.publish(info_cam_9_);
+			// publish images
+			cam_8_pub_.publish(msg_left_image);
+			cam_9_pub_.publish(msg_right_image);
+
+			// set camera info header, stereo cameras have the save frame_id
+			setCameraInfoHeader(info_cam_8_, width_, height_, frame_time_,
+					    "cam_8_optical_frame");
+			setCameraInfoHeader(info_cam_9_, width_, height_, frame_time_,
+					    "cam_8_optical_frame");
+			// publish camera info
+			cam_8_info_pub_.publish(info_cam_8_);
+			cam_9_info_pub_.publish(info_cam_9_);
+		}
 	}
 
-	if (cam_id == 12 && frameCounter_ % modulo_ == 0) {  // select_cam = 2 + 3
+	if (cam_id == 12) {  // select_cam = 2 + 3
 		// FPGA can only send 2 images at time, but all of them are took at the same
 		// time, so the image time stamp should be set to the first camera pair
 		// set timestamp if cam 8 + 9 raw is disabled
-		if(n_cameras_ >=9 ){//&& (camera_config_ & 0x010) ==0){
+		if(n_cameras_ >= 9 && !(camera_config_ & 0x010)) {
 			frame_time_ = fpga_frame_time;
 			frameCounter_++;
 		}
-		msg_left_image.header.stamp = frame_time_;
-		msg_right_image.header.stamp = frame_time_;
-		// set frame_id on images
-		msg_left_image.header.frame_id = "cam_8_corrected_frame";
-		msg_right_image.header.frame_id = "cam_8_disparity_frame";
 
-		// publish images
-		cam_8c_pub_.publish(msg_left_image);
-		cam_8d_pub_.publish(msg_right_image);
+		if (frameCounter_ % modulo_ == 0) {
+			msg_left_image.header.stamp = frame_time_;
+			msg_right_image.header.stamp = frame_time_;
+			// set frame_id on images
+			msg_left_image.header.frame_id = "cam_8_corrected_frame";
+			msg_right_image.header.frame_id = "cam_8_disparity_frame";
 
+			// publish images
+			cam_8c_pub_.publish(msg_left_image);
+			cam_8d_pub_.publish(msg_right_image);
+		}
 	}
 
 	ROS_DEBUG("Frame Time: %f \n", frame_time_.toSec());
