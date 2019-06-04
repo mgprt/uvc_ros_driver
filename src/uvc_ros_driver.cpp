@@ -1262,7 +1262,12 @@ void uvcROSDriver::uvc_cb(uvc_frame_t *frame)
 	if (cam_id == 4) {  // select_cam = 8 + 9
 		// set timestamp for all frames if cam 8 + 9 enabled here
 		// See the case for cam_id == 0 for an explanation.
-		if(n_cameras_ >= 9) {
+		// Compared to cam_id == 0, i.e., the first stero pair, the order
+		// seems to be reversed here and the rectified/disparity image arrive
+		// before the grayscale images. Therefore, set this timestamp only
+		// if we do not publish rectified images (otherwise the timestamp is
+		// updated twice).
+		if(n_cameras_ >= 9 && !(camera_config_ & 0x200)) {
 			frame_time_ = fpga_frame_time;
 			frameCounter_++;
 		}
@@ -1293,7 +1298,7 @@ void uvcROSDriver::uvc_cb(uvc_frame_t *frame)
 		// FPGA can only send 2 images at time, but all of them are took at the same
 		// time, so the image time stamp should be set to the first camera pair
 		// set timestamp if cam 8 + 9 raw is disabled
-		if(n_cameras_ >= 9 && !(camera_config_ & 0x010)) {
+		if(n_cameras_ >= 9) {
 			frame_time_ = fpga_frame_time;
 			frameCounter_++;
 		}
